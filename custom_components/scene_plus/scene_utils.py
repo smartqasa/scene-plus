@@ -48,7 +48,19 @@ async def get_scene_entities(
     """Return entity dict from a scene ID."""
     scenes = await load_scenes_file(hass)
 
+    if not isinstance(scenes, list):
+        _LOGGER.warning("Invalid scenes data; expected list, got %s", type(scenes))
+        return None
+
     for scene in scenes:
+
+        if not isinstance(scene, dict):
+            _LOGGER.warning(
+                "Skipping invalid scene entry; expected dict, got %s",
+                type(scene),
+            )
+            continue
+
         if scene.get("id") == scene_id:
             return scene.get("entities", {})
 
@@ -86,10 +98,24 @@ async def update_scene_entities(
     async with CAPTURE_LOCK:
         scenes = await load_scenes_file(hass)
 
-        index = next(
-            (i for i, s in enumerate(scenes) if s.get("id") == scene_id),
-            None,
-        )
+        if not isinstance(scenes, list):
+            _LOGGER.warning("Invalid scenes data; expected list, got %s", type(scenes))
+            return {
+                "success": False,
+                "message": "Invalid scenes data; expected a list of scenes",
+            }
+
+        index = None
+        for i, scene in enumerate(scenes):
+            if not isinstance(scene, dict):
+                _LOGGER.warning(
+                    "Skipping invalid scene entry; expected dict, got %s",
+                    type(scene),
+                )
+                continue
+            if scene.get("id") == scene_id:
+                index = i
+                break
         if index is None:
             return {
                 "success": False,
