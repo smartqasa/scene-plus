@@ -47,7 +47,17 @@ def register_scene_services(hass: HomeAssistant) -> None:
         return await update_scene_entities(hass, scene_id)
 
     async def handle_reload(call: ServiceCall) -> ServiceResponse:
-        await hass.services.async_call("scene", "reload")
+        try:
+            await hass.services.async_call(
+                "scene",
+                "reload",
+                blocking=True,
+            )
+        except Exception as exc:
+            return {
+                "success": False,
+                "error": str(exc),
+            }
         return {"success": True}
 
     hass.services.async_register(
