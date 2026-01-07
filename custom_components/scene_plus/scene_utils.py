@@ -99,28 +99,33 @@ def _update_scenes_file_sync(
         return False, "Invalid scenes data; expected a list of scenes"
 
     for idx, scene in enumerate(scenes):
-        if isinstance(scene, dict) and scene.get("id") == scene_id:
-            entities = dict(scene.get("entities", {}))
+        if not isinstance(scene, dict) or scene.get("id") != scene_id:
+            continue
 
-            for ent_id in list(entities):
-                update = state_attributes.get(ent_id)
-                if not update:
-                    continue
+        entities = dict(scene.get("entities", {}))
 
-                merged = dict(entities.get(ent_id, {}))
+        for ent_id, existing in entities.items():
+            update = state_attributes.get(ent_id)
+            if not update:
+                continue
 
-                if "attributes" in update:
-                    merged.update(update["attributes"])
-                if "state" in update:
-                    merged["state"] = update["state"]
+            if not isinstance(existing, dict):
+                existing = {}
 
-                entities[ent_id] = merged
+            merged = dict(existing)
 
-            scene["entities"] = entities
-            scenes[idx] = scene
+            # Overlay live state (authoritative)
+            merged.update(update.get("attributes", {}))
+            if "state" in update:
+                merged["state"] = update["state"]
 
-            _write_scenes_file_sync(config_dir, scenes)
-            return True, f"Scene {scene_id} updated"
+            entities[ent_id] = merged
+
+        scene["entities"] = entities
+        scenes[idx] = scene
+
+        _write_scenes_file_sync(config_dir, scenes)
+        return True, f"Scene {scene_id} updated"
 
     return False, f"Scene {scene_id} not found"
 
