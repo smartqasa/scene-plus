@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Mapping
 
 try:
     import fcntl
-except ImportError:  # pragma: no cover - only used on non-POSIX platforms
+except ImportError:
     fcntl = None
 
 from ruamel.yaml import YAML
@@ -162,10 +162,28 @@ def _update_scenes_file_sync(
         entities = dict(scene.get("entities", {}))
 
         for ent_id in list(entities):
-            attributes = state_attributes.get(ent_id)
-            if attributes is None:
+            update_data = state_attributes.get(ent_id)
+            if update_data is None:
                 continue
-            entities[ent_id] = attributes
+
+            existing_entry = entities.get(ent_id, {})
+            if not isinstance(existing_entry, dict):
+                existing_entry = {}
+
+            merged_entry = dict(existing_entry)
+
+            if "attributes" in update_data or "state" in update_data:
+                if "attributes" in update_data:
+                    merged_entry["attributes"] = update_data["attributes"]
+                if "state" in update_data:
+                    merged_entry["state"] = update_data["state"]
+            else:
+                merged_entry["attributes"] = update_data
+
+            if "attributes" not in merged_entry:
+                merged_entry["attributes"] = {}
+
+            entities[ent_id] = merged_entry
 
         scene["entities"] = entities
         scenes[index] = scene
@@ -188,7 +206,10 @@ async def update_scene_entities(
                 if v is not None and k not in SCENE_ATTRIBUTE_EXCLUDE
             }
 
-            state_attributes[state.entity_id] = attributes
+            state_attributes[state.entity_id] = {
+                "state": str(state.state),
+                "attributes": attributes,
+            }
 
         try:
             success, message = await hass.async_add_executor_job(
