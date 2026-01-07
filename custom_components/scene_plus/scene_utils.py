@@ -17,12 +17,6 @@ yaml = YAML(typ="rt")
 yaml.allow_unicode = True
 yaml.default_flow_style = False
 
-SCENE_ATTRIBUTE_EXCLUDE = {
-    "device_id",
-    "area_id",
-    "zone_id",
-}
-
 CAPTURE_LOCK = asyncio.Lock()
 
 
@@ -142,7 +136,7 @@ async def update_scene_entities(
             attrs = {
                 k: safe_item(v)
                 for k, v in state.attributes.items()
-                if v is not None and k not in SCENE_ATTRIBUTE_EXCLUDE
+                if v is not None
             }
 
             state_attributes[state.entity_id] = {
