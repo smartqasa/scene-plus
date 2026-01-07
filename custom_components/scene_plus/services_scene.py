@@ -79,7 +79,9 @@ def register_scene_services(hass: HomeAssistant) -> None:
         schema=vol.Schema(
             {
                 vol.Required("entity_id"): vol.All(
-                    cv.ensure_list, [cv.entity_id]
+                    cv.ensure_list,
+                    [cv.entity_id],
+                    vol.Length(min=1),
                 ),
             }
         ),
@@ -93,7 +95,9 @@ def register_scene_services(hass: HomeAssistant) -> None:
         schema=vol.Schema(
             {
                 vol.Required("entity_id"): vol.All(
-                    cv.ensure_list, [cv.entity_id]
+                    cv.ensure_list,
+                    [cv.entity_id],
+                    vol.Length(min=1),
                 ),
             }
         ),
