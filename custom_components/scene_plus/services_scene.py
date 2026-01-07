@@ -19,7 +19,13 @@ def register_scene_services(hass: HomeAssistant) -> None:
     """Register scene_plus services."""
 
     async def handle_get(call: ServiceCall) -> ServiceResponse:
-        entity_id = call.data["entity_id"][0]
+        entity_ids = call.data.get("entity_id", [])
+        if not entity_ids:
+            return {
+                "success": False,
+                "error": "entity_id is required",
+            }
+        entity_id = entity_ids[0]
         scene_id = await retrieve_scene_id(hass, entity_id)
 
         if scene_id is None:
@@ -35,7 +41,13 @@ def register_scene_services(hass: HomeAssistant) -> None:
         }
 
     async def handle_update(call: ServiceCall) -> ServiceResponse:
-        entity_id = call.data["entity_id"][0]
+        entity_ids = call.data.get("entity_id", [])
+        if not entity_ids:
+            return {
+                "success": False,
+                "error": "entity_id is required",
+            }
+        entity_id = entity_ids[0]
         scene_id = await retrieve_scene_id(hass, entity_id)
 
         if scene_id is None:
