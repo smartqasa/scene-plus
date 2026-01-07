@@ -3,13 +3,7 @@ import os
 import tempfile
 import asyncio
 import logging
-from contextlib import contextmanager
 from typing import Any, Dict, List, Mapping
-
-try:
-    import fcntl
-except ImportError:
-    fcntl = None
 
 from ruamel.yaml import YAML
 from homeassistant.core import HomeAssistant
@@ -59,56 +53,15 @@ async def get_scene_entities(
         return None
 
     for scene in scenes:
-
-        if not isinstance(scene, dict):
-            _LOGGER.warning(
-                "Skipping invalid scene entry; expected dict, got %s",
-                type(scene),
-            )
-            continue
-
-        if scene.get("id") == scene_id:
+        if isinstance(scene, dict) and scene.get("id") == scene_id:
             return scene.get("entities", {})
 
     return None
 
 
-@contextmanager
-def _locked_scenes_file(config_dir: str):
-    """Acquire an exclusive lock for scenes.yaml operations."""
-    if fcntl is None:
-        yield None
-        return
-
-    lock_path = os.path.join(config_dir, f"{SCENES_FILE}.lock")
-    lock_file = open(lock_path, "a", encoding="utf-8")
-    try:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-        yield lock_file
-    finally:
-        try:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-        finally:
-            lock_file.close()
-
-
-def _load_scenes_file_sync(config_dir: str) -> List[Dict[str, Any]]:
-    """Load scenes.yaml synchronously (executor-only)."""
-    path = os.path.join(config_dir, SCENES_FILE)
-
-    try:
-        with open(path, "r", encoding="utf-8") as file_handle:
-            content = file_handle.read()
-        return yaml.load(content) or []
-    except FileNotFoundError:
-        _LOGGER.debug("scenes.yaml not found")
-        return []
-    except Exception:
-        _LOGGER.exception("Failed to load scenes.yaml")
-        return []
-
-
-def _write_scenes_file_sync(config_dir: str, scenes: List[Dict[str, Any]]) -> None:
+def _write_scenes_file_sync(
+    config_dir: str, scenes: List[Dict[str, Any]]
+) -> None:
     """Write scenes.yaml atomically (executor-only)."""
     path = os.path.join(config_dir, SCENES_FILE)
 
@@ -137,70 +90,56 @@ def _update_scenes_file_sync(
     state_attributes: Mapping[str, Dict[str, Any]],
 ) -> tuple[bool, str]:
     """Update scenes.yaml for a given scene ID (executor-only)."""
-    with _locked_scenes_file(config_dir):
-        scenes = _load_scenes_file_sync(config_dir)
+    path = os.path.join(config_dir, SCENES_FILE)
 
-        if not isinstance(scenes, list):
-            _LOGGER.warning("Invalid scenes data; expected list, got %s", type(scenes))
-            return False, "Invalid scenes data; expected a list of scenes"
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            scenes = yaml.load(fh) or []
+    except FileNotFoundError:
+        return False, "scenes.yaml not found"
+    except Exception:
+        _LOGGER.exception("Failed to load scenes.yaml")
+        return False, "Failed to load scenes.yaml"
 
-        index = None
-        for i, scene in enumerate(scenes):
-            if not isinstance(scene, dict):
-                _LOGGER.warning(
-                    "Skipping invalid scene entry; expected dict, got %s",
-                    type(scene),
-                )
-                continue
-            if scene.get("id") == scene_id:
-                index = i
-                break
-        if index is None:
-            return False, f"Scene {scene_id} not found"
+    if not isinstance(scenes, list):
+        return False, "Invalid scenes data; expected a list of scenes"
 
-        scene = scenes[index]
-        entities = dict(scene.get("entities", {}))
+    for idx, scene in enumerate(scenes):
+        if isinstance(scene, dict) and scene.get("id") == scene_id:
+            entities = dict(scene.get("entities", {}))
 
-        for ent_id in list(entities):
-            update_data = state_attributes.get(ent_id)
-            if update_data is None:
-                continue
+            for ent_id in list(entities):
+                update = state_attributes.get(ent_id)
+                if not update:
+                    continue
 
-            existing_entry = entities.get(ent_id, {})
-            if not isinstance(existing_entry, dict):
-                existing_entry = {}
+                merged = dict(entities.get(ent_id, {}))
 
-            merged_entry = dict(existing_entry)
+                if "attributes" in update:
+                    merged.update(update["attributes"])
+                if "state" in update:
+                    merged["state"] = update["state"]
 
-            if "attributes" in update_data or "state" in update_data:
-                if "attributes" in update_data:
-                    merged_entry["attributes"] = update_data["attributes"]
-                if "state" in update_data:
-                    merged_entry["state"] = update_data["state"]
-            else:
-                merged_entry["attributes"] = update_data
+                entities[ent_id] = merged
 
-            if "attributes" not in merged_entry:
-                merged_entry["attributes"] = {}
+            scene["entities"] = entities
+            scenes[idx] = scene
 
-            entities[ent_id] = merged_entry
+            _write_scenes_file_sync(config_dir, scenes)
+            return True, f"Scene {scene_id} updated"
 
-        scene["entities"] = entities
-        scenes[index] = scene
-
-        _write_scenes_file_sync(config_dir, scenes)
-        return True, f"Scene {scene_id} updated"
+    return False, f"Scene {scene_id} not found"
 
 
 async def update_scene_entities(
     hass: HomeAssistant, scene_id: str
 ) -> Dict[str, Any]:
     """Update entities in scenes.yaml for a given scene ID."""
-
     async with CAPTURE_LOCK:
         state_attributes: Dict[str, Dict[str, Any]] = {}
+
         for state in hass.states.async_all():
-            attributes = {
+            attrs = {
                 k: safe_item(v)
                 for k, v in state.attributes.items()
                 if v is not None and k not in SCENE_ATTRIBUTE_EXCLUDE
@@ -208,7 +147,7 @@ async def update_scene_entities(
 
             state_attributes[state.entity_id] = {
                 "state": str(state.state),
-                "attributes": attributes,
+                "attributes": attrs,
             }
 
         try:
@@ -218,13 +157,7 @@ async def update_scene_entities(
                 scene_id,
                 state_attributes,
             )
-            return {
-                "success": success,
-                "message": message,
-            }
+            return {"success": success, "message": message}
         except Exception as err:
-            _LOGGER.exception("Failed to write scenes.yaml")
-            return {
-                "success": False,
-                "message": str(err),
-            }
+            _LOGGER.exception("Failed to update scenes.yaml")
+            return {"success": False, "message": str(err)}
