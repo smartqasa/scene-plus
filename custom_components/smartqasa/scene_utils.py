@@ -2,34 +2,44 @@ import aiofiles
 import os
 import tempfile
 import asyncio
+import logging
+from typing import Any, Dict, List
+
 from ruamel.yaml import YAML
 from homeassistant.core import HomeAssistant
-import logging
 
 from .const import SCENES_FILE
 from .helpers import safe_item
+
+_LOGGER = logging.getLogger(__name__)
 
 yaml = YAML(typ="rt")
 yaml.allow_unicode = True
 yaml.default_flow_style = False
 
-_LOGGER = logging.getLogger(__name__)
-
 CAPTURE_LOCK = asyncio.Lock()
 
 
-async def load_scenes_file(hass: HomeAssistant):
-    """Load scenes.yaml"""
+async def load_scenes_file(hass: HomeAssistant) -> List[Dict[str, Any]]:
+    """Load scenes.yaml asynchronously."""
     path = os.path.join(hass.config.config_dir, SCENES_FILE)
 
-    async with aiofiles.open(path, "r", encoding="utf-8") as f:
-        content = await f.read()
+    try:
+        async with aiofiles.open(path, "r", encoding="utf-8") as f:
+            content = await f.read()
+        return yaml.load(content) or []
+    except FileNotFoundError:
+        _LOGGER.debug("scenes.yaml not found")
+        return []
+    except Exception:
+        _LOGGER.exception("Failed to load scenes.yaml")
+        return []
 
-    return yaml.load(content) or []
 
-
-async def get_scene_entities(hass: HomeAssistant, scene_id: str):
-    """Return entity list from a scene ID."""
+async def get_scene_entities(
+    hass: HomeAssistant, scene_id: str
+) -> Dict[str, Any] | None:
+    """Return entity dict from a scene ID."""
     scenes = await load_scenes_file(hass)
 
     for scene in scenes:
@@ -39,43 +49,79 @@ async def get_scene_entities(hass: HomeAssistant, scene_id: str):
     return None
 
 
-async def update_scene_entities(hass: HomeAssistant, scene_id: str):
-    """Update entities in scenes.yaml for given scene ID."""
+def _write_scenes_file_sync(config_dir: str, scenes: List[Dict[str, Any]]) -> None:
+    """Write scenes.yaml atomically (executor-only)."""
+    path = os.path.join(config_dir, SCENES_FILE)
+
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w",
+        delete=False,
+        dir=config_dir,
+        encoding="utf-8",
+    )
+    try:
+        yaml.dump(scenes, tmp)
+        tmp.flush()
+        os.fsync(tmp.fileno())
+        tmp.close()
+        os.replace(tmp.name, path)
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
+
+
+async def update_scene_entities(
+    hass: HomeAssistant, scene_id: str
+) -> Dict[str, Any]:
+    """Update entities in scenes.yaml for a given scene ID."""
 
     async with CAPTURE_LOCK:
-        path = os.path.join(hass.config.config_dir, SCENES_FILE)
-
         scenes = await load_scenes_file(hass)
 
-        # Find index
-        index = next((i for i, s in enumerate(scenes) if s.get("id") == scene_id), None)
+        index = next(
+            (i for i, s in enumerate(scenes) if s.get("id") == scene_id),
+            None,
+        )
         if index is None:
-            return {"success": False, "message": f"Scene {scene_id} not found"}
+            return {
+                "success": False,
+                "message": f"Scene {scene_id} not found",
+            }
 
         scene = scenes[index]
-        entities = scene.get("entities", {}).copy()
+        entities = dict(scene.get("entities", {}))
 
-        # Update entity attributes
-        for ent_id in list(entities.keys()):
+        for ent_id in list(entities):
             state = hass.states.get(ent_id)
             if not state:
                 continue
 
-            attributes = dict(state.attributes)
+            attributes = {
+                k: safe_item(v)
+                for k, v in state.attributes.items()
+                if v is not None
+            }
             attributes["state"] = str(state.state)
-            attributes = {k: safe_item(v) for k, v in attributes.items() if v is not None}
             entities[ent_id] = attributes
 
-        # Replace
         scene["entities"] = entities
         scenes[index] = scene
 
-        # Write atomically
         try:
-            tmp = tempfile.NamedTemporaryFile("w", delete=False, dir=hass.config.config_dir)
-            yaml.dump(scenes, tmp)
-            tmp.close()
-            os.replace(tmp.name, path)
-            return {"success": True, "message": f"Scene {scene_id} updated"}
-        except Exception as e:
-            return {"success": False, "message": str(e)}
+            await hass.async_add_executor_job(
+                _write_scenes_file_sync,
+                hass.config.config_dir,
+                scenes,
+            )
+            return {
+                "success": True,
+                "message": f"Scene {scene_id} updated",
+            }
+        except Exception as err:
+            _LOGGER.exception("Failed to write scenes.yaml")
+            return {
+                "success": False,
+                "message": str(err),
+            }

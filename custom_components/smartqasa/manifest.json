@@ -1,9 +1,9 @@
 {
   "name": "SmartQasa",
-  "version": "1.1.0",
-  "domain": "smartqasa",
-  "documentation": "https://github.com/smartqasa/ha-utilities",
-  "issue_tracker": "https://github.com/smartqasa/ha-utilities/issues",
+  "version": "0.1.0",
+  "domain": "scene_plus",
+  "documentation": "https://github.com/smartqasa/scene-plus",
+  "issue_tracker": "https://github.com/smartqasa/scene-plus/issues",
   "codeowners": ["@smartqasa"],
   "iot_class": "assumed_state",
   "quality_scale": "internal",

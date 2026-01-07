@@ -1,9 +1,6 @@
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
-from typing import cast
-
-from custom_components.smartqasa.services_config import SupportsResponse
 
 from .const import (
     DOMAIN,
@@ -18,8 +15,8 @@ from .scene_utils import (
 from .helpers import retrieve_scene_id
 
 
-def register_scene_services(hass: HomeAssistant):
-    """Register scene-related SmartQasa services."""
+def register_scene_services(hass: HomeAssistant) -> None:
+    """Register scene_plus services."""
 
     async def handle_get(call: ServiceCall) -> ServiceResponse:
         entity_id = call.data["entity_id"][0]
@@ -57,20 +54,28 @@ def register_scene_services(hass: HomeAssistant):
         DOMAIN,
         SERVICE_SCENE_GET,
         handle_get,
-        schema=vol.Schema({
-            vol.Required("entity_id"): vol.All(cv.ensure_list, [cv.entity_id]),
-        }),
-        supports_response=cast(SupportsResponse, "only"),
+        schema=vol.Schema(
+            {
+                vol.Required("entity_id"): vol.All(
+                    cv.ensure_list, [cv.entity_id]
+                ),
+            }
+        ),
+        supports_response="only",
     )
 
     hass.services.async_register(
         DOMAIN,
         SERVICE_SCENE_UPDATE,
         handle_update,
-        schema=vol.Schema({
-            vol.Required("entity_id"): vol.All(cv.ensure_list, [cv.entity_id]),
-        }),
-        supports_response=cast(SupportsResponse, "only"),
+        schema=vol.Schema(
+            {
+                vol.Required("entity_id"): vol.All(
+                    cv.ensure_list, [cv.entity_id]
+                ),
+            }
+        ),
+        supports_response="only",
     )
 
     hass.services.async_register(
