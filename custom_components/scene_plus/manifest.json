@@ -5,8 +5,8 @@
   "documentation": "https://github.com/smartqasa/scene-plus",
   "issue_tracker": "https://github.com/smartqasa/scene-plus/issues",
   "codeowners": ["@smartqasa"],
-  "iot_class": "assumed_state",
-  "quality_scale": "internal",
+  "iot_class": "local_polling",
+  "quality_scale": "silver",
   "dependencies": ["scene"],
   "requirements": ["ruamel.yaml==0.17.40"]
 }
