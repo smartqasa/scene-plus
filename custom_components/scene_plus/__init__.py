@@ -1,15 +1,13 @@
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.typing import ConfigType
+
 from .const import DOMAIN
-from .services_scene import register_scene_services
-import logging
-
-_LOGGER = logging.getLogger(__name__)
+from .services import register_scene_services
 
 
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+
     """Set up the scene_plus integration."""
-
-    _LOGGER.info("Setting up %s integration", DOMAIN)
 
     hass.data.setdefault(DOMAIN, {})
 
