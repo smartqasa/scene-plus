@@ -4,9 +4,9 @@ import homeassistant.helpers.config_validation as cv
 
 from .const import (
     DOMAIN,
-    SERVICE_SCENE_GET,
-    SERVICE_SCENE_UPDATE,
-    SERVICE_SCENE_RELOAD,
+    SERVICE_GET_ENTITIES,
+    SERVICE_UPDATE,
+    SERVICE_RELOAD,
 )
 from .scene_utils import (
     get_scene_entities,
@@ -52,7 +52,7 @@ def register_scene_services(hass: HomeAssistant) -> None:
 
     hass.services.async_register(
         DOMAIN,
-        SERVICE_SCENE_GET,
+        SERVICE_GET_ENTITIES,
         handle_get,
         schema=vol.Schema(
             {
@@ -66,7 +66,7 @@ def register_scene_services(hass: HomeAssistant) -> None:
 
     hass.services.async_register(
         DOMAIN,
-        SERVICE_SCENE_UPDATE,
+        SERVICE_UPDATE,
         handle_update,
         schema=vol.Schema(
             {
@@ -80,7 +80,7 @@ def register_scene_services(hass: HomeAssistant) -> None:
 
     hass.services.async_register(
         DOMAIN,
-        SERVICE_SCENE_RELOAD,
+        SERVICE_RELOAD,
         handle_reload,
         schema=vol.Schema({}),
     )

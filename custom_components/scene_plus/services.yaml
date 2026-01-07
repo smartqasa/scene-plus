@@ -1,5 +1,5 @@
-scene_get:
-  name: Get Scene
+get_entities:
+  name: Get Scene Entities
   description: Retrieves entity IDs stored in a given scene.
   target:
     entity:
@@ -16,13 +16,13 @@ scene_get:
             type: string
             example: 'light.kitchen_lights'
 
-scene_reload:
+reload:
   name: Reload Scenes
   description:
     Reloads all scenes from scenes.yaml without requiring a specific entity.
   fields: {}
 
-scene_update:
+update:
   name: Update Scene
   description:
     Updates the states and attributes of a scene's entities and persists them to
