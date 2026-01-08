@@ -94,7 +94,7 @@ def register_scene_services(hass: HomeAssistant) -> None:
                 ),
             }
         ),
-        supports_response=SupportsResponse.ONLY,
+        supports_response=SupportsResponse.OPTIONAL,
     )
 
     hass.services.async_register(
