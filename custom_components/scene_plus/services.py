@@ -1,6 +1,6 @@
 from typing import Any
 
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
 
@@ -78,7 +78,7 @@ def register_scene_services(hass: HomeAssistant) -> None:
                 ),
             }
         ),
-        supports_response="only",
+        supports_response=SupportsResponse.ONLY,
     )
 
     hass.services.async_register(
@@ -94,7 +94,7 @@ def register_scene_services(hass: HomeAssistant) -> None:
                 ),
             }
         ),
-        supports_response="only",
+        supports_response=SupportsResponse.ONLY,
     )
 
     hass.services.async_register(
