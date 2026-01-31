@@ -53,29 +53,30 @@ async def get_scene_entities(
     return None
 
 
-def _write_scenes_file_sync(
-    config_dir: str, scenes: List[Dict[str, Any]]
-) -> None:
-    """Write scenes.yaml atomically (executor-only)."""
+def _write_scenes_file_sync(config_dir: str, scenes: list[dict[str, Any]]) -> None:
+    """Write scenes.yaml atomically. Only replace the target if dump succeeds."""
     path = os.path.join(config_dir, SCENES_FILE)
 
-    tmp = tempfile.NamedTemporaryFile(
-        mode="w",
-        delete=False,
-        dir=config_dir,
-        encoding="utf-8",
-    )
+    fd = None
+    tmp_path = None
     try:
-        yaml.dump(scenes, tmp)
-        tmp.flush()
-        os.fsync(tmp.fileno())
-        tmp.close()
-        os.replace(tmp.name, path)
+        fd, tmp_path = tempfile.mkstemp(prefix="scenes_plus_", suffix=".yaml", dir=config_dir)
+        with os.fdopen(fd, "w", encoding="utf-8") as tmp:
+            # If this raises, we never reach replace()
+            yaml.dump(scenes, tmp)
+            tmp.flush()
+            os.fsync(tmp.fileno())
+
+        # Replace only after the file is fully written + fsynced + closed
+        os.replace(tmp_path, path)
+        tmp_path = None  # ownership transferred; don't unlink
     finally:
-        try:
-            os.unlink(tmp.name)
-        except OSError:
-            pass
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
 
 
 def _update_scenes_file_sync(
